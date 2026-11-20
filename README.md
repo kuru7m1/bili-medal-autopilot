@@ -1,6 +1,6 @@
 # bilibili粉丝团任务工具
 
-> bili-medal-autopilot
+> bili-medal-autopilot · [GitHub 仓库](https://github.com/kuru7m1/bili-medal-autopilot)
 
 运行于 [Tampermonkey](https://www.tampermonkey.net/) 的 B 站直播辅助脚本。用户维护一份直播间白名单，脚本按序完成各房间的粉丝团每日任务。单文件实现，无外部依赖。
 
@@ -25,14 +25,15 @@
 
 ## 安装
 
-当前未发布到脚本托管站点，使用本地构建产物安装：
-
 | 方式 | 操作 |
 | --- | --- |
-| 导入文件（推荐） | 打开脚本管理器的「实用工具 → 导入」，选择本目录下的 `bili-medal-autopilot.user.js`；或直接把该文件拖入浏览器窗口 |
+| 在线安装（推荐） | 打开 [`bili-medal-autopilot.user.js`](https://raw.githubusercontent.com/kuru7m1/bili-medal-autopilot/main/bili-medal-autopilot.user.js)，脚本管理器会弹出安装页，点「安装」即可 |
+| 导入文件 | 脚本管理器「实用工具 → 导入」，选择本目录下的 `bili-medal-autopilot.user.js`；或直接把该文件拖入浏览器窗口 |
 | 手动新建 | 脚本管理器「新建脚本」，清空模板内容，把 `bili-medal-autopilot.user.js` 全文粘贴后按 `Ctrl+S` 保存 |
 
 安装完成后打开任意直播间，主播信息栏将出现「任务」按钮；亦可按 `Alt+T` 打开控制面板。
+
+脚本带有 `@updateURL`，后续版本推送到仓库 `main` 分支后，脚本管理器的「检查更新」即可获取新版。
 
 ## 注意
 

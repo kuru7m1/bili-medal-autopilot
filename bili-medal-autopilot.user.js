@@ -7,7 +7,10 @@
 // @description:en  Batch complete Bilibili live fan-medal tasks for whitelisted rooms, intimacy panel and live UX tweaks.
 // @author       kuru7m1
 // @license      MIT
-// @homepageURL  https://github.com/kuru7m1
+// @homepageURL  https://github.com/kuru7m1/bili-medal-autopilot
+// @supportURL   https://github.com/kuru7m1/bili-medal-autopilot/issues
+// @updateURL    https://raw.githubusercontent.com/kuru7m1/bili-medal-autopilot/main/bili-medal-autopilot.user.js
+// @downloadURL  https://raw.githubusercontent.com/kuru7m1/bili-medal-autopilot/main/bili-medal-autopilot.user.js
 // @match        https://live.bilibili.com/*
 // @grant        none
 // @run-at       document-start
