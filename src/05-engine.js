@@ -400,23 +400,7 @@
       if (Math.round(Number((Cfg.v.taskLimit || {})[name]) || 0) <= 0) return false;
       const target = this.limitOf(meta, name);
       if (!(target > 0)) return false;
-      /* 撞过每房间点赞保护上限：设置值和保护上限都没放宽，今天就是做不到，
-         继续按「未做满」重排只会每 2 秒重试一次、刷一行日志 */
-      const co = Daily.get(meta).capOut[name];
-      if (co && target <= (Number(co.target) || 0) &&
-        (Number(Cfg.v.like.capClicks) || 310) <= (Number(co.cap) || 0)) return false;
       return this.progressOf(meta, name).cur < target;
-    },
-
-    /* 记下「今天撞到每房间点赞保护上限」。返回 true 表示第一次记录，
-       调用方据此只打一条日志；用户之后调高 capClicks 或降低设置值时，keepOverflow 会忽略它 */
-    noteCapOut(meta, name, target, cap) {
-      if (!meta) return false;
-      const r = Daily.get(meta);
-      const prev = r.capOut[name];
-      r.capOut[name] = { target: Math.round(Number(target) || 0), cap: Math.round(Number(cap) || 0) };
-      Daily.saveSoon();
-      return !prev;
     },
 
     /* 记下「服务端已经做到上限」这一刻的本地计数（点赞次数 / 弹幕条数 / 观时秒数）。
@@ -511,7 +495,7 @@
       return this.progressOf(meta, name).cur >= max;
     },
 
-    /* 储蓄亲密度已满：观时与分享不再产生收益（点赞/弹幕仍算今日互动，可维持点亮） */
+    /* 储蓄亲密度已满：只维持点亮，其余任务都不再产生收益 */
     isFreeFull(meta) {
       if (!meta || !Cfg.v.freeFullLite) return false;
       if (meta.freeReach) return true;
@@ -527,7 +511,7 @@
       this.syncOverflowDone(meta);
       const full = this.isFreeFull(meta);
       const basic = Daily.allDone(meta, (name) =>
-        this.taskOn(meta, name) && !(full && (name === 'watch' || name === 'share')) &&
+        this.taskOn(meta, name) && !(full && name !== 'light') &&
         !this.limitReached(meta, name));
       if (!basic) return false;
       /* 分享每天只有一次机会，且服务端没有可对账的进度：
@@ -645,8 +629,8 @@
       /* 确定没有粉丝牌：五项都做不了，统一显示「无牌」，不再逐项执行
          （索引未加载成功属于未知，放行，交给任务自身判断） */
       if (Data.medalState(meta) === 'none') return 'nomedal';
-      /* 满储：观时与分享不再产生收益，直接跳过（点亮/点赞/弹幕保留） */
-      if (this.isFreeFull(meta) && (name === 'watch' || name === 'share')) return 'skip';
+      /* 满储：只做点亮，点赞/弹幕/观时/分享全部跳过 */
+      if (this.isFreeFull(meta) && name !== 'light') return 'skip';
       /* 分享每天只有一次机会：接口调用过就固定显示「待确认」，
          刷新插件、清空内存 park 都不会让它重跑 */
       if (name === 'share' && Daily.get(meta).shareTried) return 'defer';
@@ -1091,7 +1075,7 @@
           if (cur && cur.roomId === id && cur.name === name) return 'run';
           if (name === 'watch' && this.watches.some((w) => String(w.roomId) === String(id))) return 'run';
           /* 满储跳过优先于旧的 park 记录：策略跳过不是失败 */
-          if (meta && this.isFreeFull(meta) && (name === 'watch' || name === 'share')) return 'skip';
+          if (meta && this.isFreeFull(meta) && name !== 'light') return 'skip';
           if (this.retryInfo(id, name)) return 'retry';
           return st;
         };

@@ -381,6 +381,15 @@ check('配置：任务上限默认留空、按任务开关', () => {
   T.Cfg.load();
 });
 
+check('配置：旧版点赞保护上限字段会被清掉', () => {
+  const prev = win.localStorage.getItem('bma.config.v1');
+  win.localStorage.setItem('bma.config.v1', JSON.stringify({ like: { capClicks: 90 } }));
+  T.Cfg.load();
+  assert(!Object.prototype.hasOwnProperty.call(T.Cfg.v.like, 'capClicks'), '旧字段应被清除');
+  if (prev == null) win.localStorage.removeItem('bma.config.v1');
+  else win.localStorage.setItem('bma.config.v1', prev);
+  T.Cfg.load();
+});
 check('hms / clock', () => {
   assertEq(T.hms(3661), '1小时1分');
   assertEq(T.clock(65), '1:05');
@@ -1520,7 +1529,6 @@ await checkAsync('观时：同一房间不会启动第二个心跳会话', async
     };
     T.Cfg.v.like.gapMin = 1;
     T.Cfg.v.like.gapMax = 1;
-    T.Cfg.v.like.capClicks = 310;
     T.Engine.running = true;
     T.Daily.date = '';
     T.Daily.rooms = {};
@@ -1554,7 +1562,6 @@ await checkAsync('观时：同一房间不会启动第二个心跳会话', async
     T.API.likeReport = async (roomId, uid, n) => { clicks += n; return { code: 0 }; };
     T.Cfg.v.like.gapMin = 1;
     T.Cfg.v.like.gapMax = 1;
-    T.Cfg.v.like.capClicks = 1000;
     T.Engine.running = true;
     T.Daily.date = '';
     T.Daily.rooms = {};
@@ -1566,26 +1573,6 @@ await checkAsync('观时：同一房间不会启动第二个心跳会话', async
     const meta = { roomId: 778, uid: 44 };
     assertEq(T.Engine.keepOverflow(meta, 'like'), false, '做满后不应继续判定未完成');
     assertEq(T.Engine.taskState(meta, 'like'), 'done', '做满后应保持完成');
-
-    /* 每房间点赞保护上限先到：也应写完成，避免对账清掉后无限重跑 */
-    clicks = 0;
-    T.Daily.rooms = {};
-    T.Cfg.v.like.capClicks = 90;
-    const meta2 = { roomId: 779, uid: 45 };
-    const res2 = await T.Tasks.like(meta2, { maxRounds: userLimit });
-    assertEq(res2.status, 'done', '撞保护上限也应完成：' + JSON.stringify(res2));
-    assertEq(clicks, 90, '应停在保护上限');
-    assert(T.Daily.isDone(meta2, 'like'), '撞保护上限也应写完成');
-    /* 撞过保护上限后，进度永远到不了设置值：不能再判定未完成，
-       否则每一轮调度都会重跑一次、刷一条「已做到 B 站任务上限」 */
-    assertEq(T.Engine.keepOverflow(meta2, 'like'), false, '撞保护上限后不应继续判定未完成');
-    assertEq(T.Engine.taskState(meta2, 'like'), 'done', '撞保护上限后应保持完成');
-    assertEq(T.Engine.noteCapOut(meta2, 'like', userLimit, 90), false, '重复记录应返回 false（不再打日志）');
-    T.Daily.done(meta2, 'like', false);
-    const res3 = await T.Tasks.like(meta2, { maxRounds: userLimit });
-    assertEq(res3.status, 'done', '撞保护上限后再调应直接完成');
-    assertEq(clicks, 90, '撞保护上限后不应再点赞');
-    T.Cfg.v.like.capClicks = 310;
     T.Cfg.v.taskLimit = prevTL;
   });
 
@@ -1642,7 +1629,6 @@ await checkAsync('观时：同一房间不会启动第二个心跳会话', async
     T.Daily.get(meta).like = 300;
     let calls = 0;
     T.API.likeReport = async (roomId, uid, n) => { calls += n; return { code: 0 }; };
-    T.Cfg.v.like.capClicks = 310;
     T.Engine.running = true;
 
     assertEq(T.Engine.taskState(meta, 'like'), 'done', '已做满 10 轮应显示完成');
@@ -1722,7 +1708,6 @@ await checkAsync('观时：同一房间不会启动第二个心跳会话', async
     T.API.likeReport = async (roomId, uid, n) => { clicks += n; return { code: 0 }; };
     T.Cfg.v.like.gapMin = 1;
     T.Cfg.v.like.gapMax = 1;
-    T.Cfg.v.like.capClicks = 310;
     T.Engine.running = true;
     T.Daily.date = todayOf();
     T.Daily.rooms = {};
@@ -1762,7 +1747,6 @@ await checkAsync('观时：同一房间不会启动第二个心跳会话', async
     T.API.likeReport = async (roomId, uid, n) => { clicks += n; return { code: 0 }; };
     T.Cfg.v.like.gapMin = 1;
     T.Cfg.v.like.gapMax = 1;
-    T.Cfg.v.like.capClicks = 310;
     T.Engine.running = true;
     T.Daily.date = todayOf();
     T.Daily.rooms = {};
@@ -2433,10 +2417,11 @@ await checkAsync('观时：同一房间不会启动第二个心跳会话', async
     assertEq(T.Actions.clearErr({ getAttribute: () => '7312' }), undefined, '重复清除不应报错');
   });
 
-  check('满储：观时与分享跳过，点亮/点赞/弹幕保留', () => {
+  check('满储：只保留点亮，点赞/弹幕/观时/分享跳过', () => {
     T.Cfg.v.tasks = { light: true, like: true, danmu: true, watch: true, share: true };
     T.Cfg.v.freeFullLite = true;
     T.Daily.rooms = {};
+    T.Engine.failState.clear();
     const full = { roomId: 7411, uid: 7411, liveStatus: 1, freeIntimacy: 100, freeReach: true };
     const partial = { roomId: 7412, uid: 7412, liveStatus: 1, freeIntimacy: 99 };
     T.Data.medals.set('u7411', { medal: { target_id: 7411 } });
@@ -2444,20 +2429,22 @@ await checkAsync('观时：同一房间不会启动第二个心跳会话', async
 
     assertEq(T.Engine.isFreeFull(full), true, '满 100 应判定满储');
     assertEq(T.Engine.isFreeFull(partial), false, '99 不应判定满储');
-    assertEq(T.Engine.taskState(full, 'watch'), 'skip');
-    assertEq(T.Engine.taskState(full, 'share'), 'skip');
     assertEq(T.Engine.taskState(full, 'light'), 'ready', '点亮仍要做');
-    assertEq(T.Engine.taskState(full, 'like'), 'ready', '点赞仍要做');
-    assertEq(T.Engine.taskState(full, 'danmu'), 'waitOffline', '直播中弹幕按设置等下播');
+    ['like', 'danmu', 'watch', 'share'].forEach((n) => {
+      assertEq(T.Engine.taskState(full, n), 'skip', n + ' 应跳过');
+    });
+    assertEq(T.Engine.hasWork(full), true, '未点亮时应只剩点亮可做');
+    T.Daily.done(full, 'light', true);
+    assertEq(T.Engine.hasWork(full), false, '点亮完成后不应再有任务');
+    assertEq(T.Engine.allDone(full), true, '满储时点亮完成即算完成');
+
     T.Daily.done(partial, 'light', true);
     assertEq(T.Engine.taskState(partial, 'watch'), 'ready', '未满储应正常观时');
 
-    ['light', 'like', 'danmu'].forEach((n) => T.Daily.done(full, n, true));
-    assertEq(T.Engine.allDone(full), true, '满储时观时/分享应视为不适用');
-
     T.Cfg.v.freeFullLite = false;
+    assertEq(T.Engine.taskState(full, 'like'), 'ready', '关闭策略后应恢复点赞');
     assertEq(T.Engine.taskState(full, 'watch'), 'ready', '关闭策略后应恢复观时');
-    assertEq(T.Engine.allDone(full), false, '关闭策略后观时仍算未完成');
+    assertEq(T.Engine.allDone(full), false, '关闭策略后点赞/观时仍算未完成');
     T.Cfg.v.freeFullLite = true;
     T.Data.medals.delete('u7411');
     T.Data.medals.delete('u7412');

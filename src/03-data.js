@@ -20,8 +20,8 @@
     whitelist: [],
     blacklist: [],
     tasks: { light: true, like: true, danmu: true, watch: true, share: true },
-    /* 储蓄亲密度满 100 时只维持点亮：跳过观时与分享，保留点亮/点赞/弹幕。
-       实测满储时点赞/弹幕仍算「今日互动」，可以保持灯牌点亮 */
+    /* 储蓄亲密度满 100 时只维持点亮：只做点亮，跳过点赞/弹幕/观时/分享。
+       点亮本身若需要互动，会在点亮任务内部触发一次最小动作 */
     freeFullLite: true,
     /* 每项任务每天做多少：0 或留空 = 跟随服务端任务上限（默认）。
        填写数字则按该值执行：关闭 brk 时取 min(设置值, 服务端上限)，开启 brk 时按设置值。
@@ -38,8 +38,7 @@
       batchMin: 10,
       batchMax: 20,
       gapMin: 8,
-      gapMax: 18,
-      capClicks: 310
+      gapMax: 18
     },
     danmu: {
       list: DEFAULT_DANMU.slice(),
@@ -165,6 +164,8 @@
           tl[k] = n > 0 ? n : 0;
         });
       }
+      /* 1.1.0：点赞不再设本地上限，清掉旧配置里的保护上限字段 */
+      if (this.v.like) delete this.v.like.capClicks;
       /* 1.20.0：分享任务重新上线（接口为 shareConf，1.17.1 删除是因为当时找错了接口）。
          老配置里可能残留着 1.17.1 之前的 tasks.share，语义相同，直接沿用默认值即可。 */
       return this.v;
@@ -251,7 +252,7 @@
 
     /* 把磁盘上更新的内容并进内存。
        计数当天只增不减，取大；done 取并集；错误信息取 errAt 较新的那一条；
-       超上限基线/保护上限标记保留已有的，缺了才补 */
+       超上限基线保留已有的，缺了才补 */
     mergeFrom(stored) {
       const rooms = stored && isPlainObject(stored.rooms) ? stored.rooms : {};
       Object.keys(rooms).forEach((k) => {
@@ -270,12 +271,6 @@
           if (!isPlainObject(cur.overBase)) cur.overBase = {};
           Object.keys(old.overBase).forEach((name) => {
             if (!cur.overBase[name]) cur.overBase[name] = old.overBase[name];
-          });
-        }
-        if (isPlainObject(old.capOut)) {
-          if (!isPlainObject(cur.capOut)) cur.capOut = {};
-          Object.keys(old.capOut).forEach((name) => {
-            if (!cur.capOut[name]) cur.capOut[name] = old.capOut[name];
           });
         }
         if ((Number(old.errAt) || 0) > (Number(cur.errAt) || 0)) {
@@ -357,7 +352,7 @@
         }
       }
       if (!r) {
-        r = { roomId: 0, uid: 0, like: 0, danmu: 0, watch: 0, self: 0, light: 0, likeSrv: 0, danmuSrv: 0, shareGain: 0, done: {}, overBase: {}, capOut: {}, err: '', errAt: 0, errTask: '' };
+        r = { roomId: 0, uid: 0, like: 0, danmu: 0, watch: 0, self: 0, light: 0, likeSrv: 0, danmuSrv: 0, shareGain: 0, done: {}, overBase: {}, err: '', errAt: 0, errTask: '' };
         this.rooms[key] = r;
       }
       if (t && typeof t === 'object') {
@@ -366,7 +361,6 @@
       }
       if (!isPlainObject(r.done)) r.done = {};
       if (!isPlainObject(r.overBase)) r.overBase = {};
-      if (!isPlainObject(r.capOut)) r.capOut = {};
       return r;
     },
 
@@ -391,12 +385,6 @@
           if (isPlainObject(old.overBase)) {
             Object.keys(old.overBase).forEach((k) => {
               if (!cur.overBase[k]) cur.overBase[k] = old.overBase[k];
-            });
-          }
-          if (!isPlainObject(cur.capOut)) cur.capOut = {};
-          if (isPlainObject(old.capOut)) {
-            Object.keys(old.capOut).forEach((k) => {
-              if (!cur.capOut[k]) cur.capOut[k] = old.capOut[k];
             });
           }
           if (!cur.err) cur.err = old.err || '';

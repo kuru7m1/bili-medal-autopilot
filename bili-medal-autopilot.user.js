@@ -982,8 +982,8 @@
     whitelist: [],
     blacklist: [],
     tasks: { light: true, like: true, danmu: true, watch: true, share: true },
-    /* 储蓄亲密度满 100 时只维持点亮：跳过观时与分享，保留点亮/点赞/弹幕。
-       实测满储时点赞/弹幕仍算「今日互动」，可以保持灯牌点亮 */
+    /* 储蓄亲密度满 100 时只维持点亮：只做点亮，跳过点赞/弹幕/观时/分享。
+       点亮本身若需要互动，会在点亮任务内部触发一次最小动作 */
     freeFullLite: true,
     /* 每项任务每天做多少：0 或留空 = 跟随服务端任务上限（默认）。
        填写数字则按该值执行：关闭 brk 时取 min(设置值, 服务端上限)，开启 brk 时按设置值。
@@ -1000,8 +1000,7 @@
       batchMin: 10,
       batchMax: 20,
       gapMin: 8,
-      gapMax: 18,
-      capClicks: 310
+      gapMax: 18
     },
     danmu: {
       list: DEFAULT_DANMU.slice(),
@@ -1127,6 +1126,8 @@
           tl[k] = n > 0 ? n : 0;
         });
       }
+      /* 1.1.0：点赞不再设本地上限，清掉旧配置里的保护上限字段 */
+      if (this.v.like) delete this.v.like.capClicks;
       /* 1.20.0：分享任务重新上线（接口为 shareConf，1.17.1 删除是因为当时找错了接口）。
          老配置里可能残留着 1.17.1 之前的 tasks.share，语义相同，直接沿用默认值即可。 */
       return this.v;
@@ -1213,7 +1214,7 @@
 
     /* 把磁盘上更新的内容并进内存。
        计数当天只增不减，取大；done 取并集；错误信息取 errAt 较新的那一条；
-       超上限基线/保护上限标记保留已有的，缺了才补 */
+       超上限基线保留已有的，缺了才补 */
     mergeFrom(stored) {
       const rooms = stored && isPlainObject(stored.rooms) ? stored.rooms : {};
       Object.keys(rooms).forEach((k) => {
@@ -1232,12 +1233,6 @@
           if (!isPlainObject(cur.overBase)) cur.overBase = {};
           Object.keys(old.overBase).forEach((name) => {
             if (!cur.overBase[name]) cur.overBase[name] = old.overBase[name];
-          });
-        }
-        if (isPlainObject(old.capOut)) {
-          if (!isPlainObject(cur.capOut)) cur.capOut = {};
-          Object.keys(old.capOut).forEach((name) => {
-            if (!cur.capOut[name]) cur.capOut[name] = old.capOut[name];
           });
         }
         if ((Number(old.errAt) || 0) > (Number(cur.errAt) || 0)) {
@@ -1319,7 +1314,7 @@
         }
       }
       if (!r) {
-        r = { roomId: 0, uid: 0, like: 0, danmu: 0, watch: 0, self: 0, light: 0, likeSrv: 0, danmuSrv: 0, shareGain: 0, done: {}, overBase: {}, capOut: {}, err: '', errAt: 0, errTask: '' };
+        r = { roomId: 0, uid: 0, like: 0, danmu: 0, watch: 0, self: 0, light: 0, likeSrv: 0, danmuSrv: 0, shareGain: 0, done: {}, overBase: {}, err: '', errAt: 0, errTask: '' };
         this.rooms[key] = r;
       }
       if (t && typeof t === 'object') {
@@ -1328,7 +1323,6 @@
       }
       if (!isPlainObject(r.done)) r.done = {};
       if (!isPlainObject(r.overBase)) r.overBase = {};
-      if (!isPlainObject(r.capOut)) r.capOut = {};
       return r;
     },
 
@@ -1353,12 +1347,6 @@
           if (isPlainObject(old.overBase)) {
             Object.keys(old.overBase).forEach((k) => {
               if (!cur.overBase[k]) cur.overBase[k] = old.overBase[k];
-            });
-          }
-          if (!isPlainObject(cur.capOut)) cur.capOut = {};
-          if (isPlainObject(old.capOut)) {
-            Object.keys(old.capOut).forEach((k) => {
-              if (!cur.capOut[k]) cur.capOut[k] = old.capOut[k];
             });
           }
           if (!cur.err) cur.err = old.err || '';
@@ -2131,18 +2119,8 @@
       /* 这里才真的要超过服务端上限：提示每个房间每天只打一条，避免每次调度都刷一遍 */
       if (over && isTaskDone(item)) logOverOnce(meta, 'like', o.maxRounds, ' 轮');
 
-      const capClicks = Number(Cfg.v.like.capClicks) || 310;
-      const already = Number(Daily.get(meta).like) || 0;
-      const planned = needRounds * perRound;
-      const budget = Math.max(0, Math.min(planned, capClicks - already));
-      /* 保护上限先到：今天不可能再做满设置值，按完成处理，避免对账反复重跑 */
-      const cappedOut = budget < planned;
-      const capNew = cappedOut ? Engine.noteCapOut(meta, 'like', o.maxRounds || 0, capClicks) : false;
-      if (budget <= 0) {
-        Daily.done(meta, 'like', true);
-        if (capNew) Log.warn('点赞', '房间 ' + roomId + ' 已达每房间点赞保护上限（' + capClicks + ' 次），今日不再点赞');
-        return { status: 'done', reason: '已达本房间每日点赞上限' };
-      }
+      /* 不做本地保护上限：开启「允许超过服务端上限」后按设置值执行到底 */
+      const budget = needRounds * perRound;
 
       Log.log('点赞', '房间 ' + roomId + ' 计划点赞 ' + budget + ' 次（每轮 ' + perRound + ' 次，剩 ' + needRounds + ' 轮）');
       let sent = 0;
@@ -2224,15 +2202,10 @@
       const reachedTarget = !over || (o.maxRounds > 0 && Engine.progressOf(meta, 'like').cur >= o.maxRounds);
       /* 本房间允许的轮次已经做完（自定义上限低于服务端剩余轮次时，服务端不会 is_done），
          按当天完成处理，不写红字 */
-      const reachedPlan = o.maxRounds > 0 && sent >= planned;
-      if ((done || reachedPlan || cappedOut) && (reachedTarget || cappedOut)) {
+      const reachedPlan = o.maxRounds > 0 && sent >= budget;
+      if ((done || reachedPlan) && reachedTarget) {
         Daily.done(meta, 'like', true);
-        if (cappedOut && !reachedPlan) {
-          if (capNew) {
-            Log.warn('点赞', '房间 ' + roomId + ' 已达每房间点赞保护上限（设置 ' + o.maxRounds +
-              ' 轮，实际 ' + Math.floor(sent / perRound) + ' 轮），今日不再继续');
-          }
-        } else if (done) {
+        if (done) {
           Log.ok('点赞', '房间 ' + roomId + ' 点赞任务已完成（本次 ' + sent + ' 次）');
         } else if (over) {
           Log.ok('点赞', '房间 ' + roomId + ' 已做到设置上限 ' + o.maxRounds + ' 轮' +
@@ -3184,23 +3157,7 @@
       if (Math.round(Number((Cfg.v.taskLimit || {})[name]) || 0) <= 0) return false;
       const target = this.limitOf(meta, name);
       if (!(target > 0)) return false;
-      /* 撞过每房间点赞保护上限：设置值和保护上限都没放宽，今天就是做不到，
-         继续按「未做满」重排只会每 2 秒重试一次、刷一行日志 */
-      const co = Daily.get(meta).capOut[name];
-      if (co && target <= (Number(co.target) || 0) &&
-        (Number(Cfg.v.like.capClicks) || 310) <= (Number(co.cap) || 0)) return false;
       return this.progressOf(meta, name).cur < target;
-    },
-
-    /* 记下「今天撞到每房间点赞保护上限」。返回 true 表示第一次记录，
-       调用方据此只打一条日志；用户之后调高 capClicks 或降低设置值时，keepOverflow 会忽略它 */
-    noteCapOut(meta, name, target, cap) {
-      if (!meta) return false;
-      const r = Daily.get(meta);
-      const prev = r.capOut[name];
-      r.capOut[name] = { target: Math.round(Number(target) || 0), cap: Math.round(Number(cap) || 0) };
-      Daily.saveSoon();
-      return !prev;
     },
 
     /* 记下「服务端已经做到上限」这一刻的本地计数（点赞次数 / 弹幕条数 / 观时秒数）。
@@ -3295,7 +3252,7 @@
       return this.progressOf(meta, name).cur >= max;
     },
 
-    /* 储蓄亲密度已满：观时与分享不再产生收益（点赞/弹幕仍算今日互动，可维持点亮） */
+    /* 储蓄亲密度已满：只维持点亮，其余任务都不再产生收益 */
     isFreeFull(meta) {
       if (!meta || !Cfg.v.freeFullLite) return false;
       if (meta.freeReach) return true;
@@ -3311,7 +3268,7 @@
       this.syncOverflowDone(meta);
       const full = this.isFreeFull(meta);
       const basic = Daily.allDone(meta, (name) =>
-        this.taskOn(meta, name) && !(full && (name === 'watch' || name === 'share')) &&
+        this.taskOn(meta, name) && !(full && name !== 'light') &&
         !this.limitReached(meta, name));
       if (!basic) return false;
       /* 分享每天只有一次机会，且服务端没有可对账的进度：
@@ -3429,8 +3386,8 @@
       /* 确定没有粉丝牌：五项都做不了，统一显示「无牌」，不再逐项执行
          （索引未加载成功属于未知，放行，交给任务自身判断） */
       if (Data.medalState(meta) === 'none') return 'nomedal';
-      /* 满储：观时与分享不再产生收益，直接跳过（点亮/点赞/弹幕保留） */
-      if (this.isFreeFull(meta) && (name === 'watch' || name === 'share')) return 'skip';
+      /* 满储：只做点亮，点赞/弹幕/观时/分享全部跳过 */
+      if (this.isFreeFull(meta) && name !== 'light') return 'skip';
       /* 分享每天只有一次机会：接口调用过就固定显示「待确认」，
          刷新插件、清空内存 park 都不会让它重跑 */
       if (name === 'share' && Daily.get(meta).shareTried) return 'defer';
@@ -3875,7 +3832,7 @@
           if (cur && cur.roomId === id && cur.name === name) return 'run';
           if (name === 'watch' && this.watches.some((w) => String(w.roomId) === String(id))) return 'run';
           /* 满储跳过优先于旧的 park 记录：策略跳过不是失败 */
-          if (meta && this.isFreeFull(meta) && (name === 'watch' || name === 'share')) return 'skip';
+          if (meta && this.isFreeFull(meta) && name !== 'light') return 'skip';
           if (this.retryInfo(id, name)) return 'retry';
           return st;
         };

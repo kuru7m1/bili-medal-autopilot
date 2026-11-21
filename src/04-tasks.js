@@ -405,18 +405,8 @@
       /* 这里才真的要超过服务端上限：提示每个房间每天只打一条，避免每次调度都刷一遍 */
       if (over && isTaskDone(item)) logOverOnce(meta, 'like', o.maxRounds, ' 轮');
 
-      const capClicks = Number(Cfg.v.like.capClicks) || 310;
-      const already = Number(Daily.get(meta).like) || 0;
-      const planned = needRounds * perRound;
-      const budget = Math.max(0, Math.min(planned, capClicks - already));
-      /* 保护上限先到：今天不可能再做满设置值，按完成处理，避免对账反复重跑 */
-      const cappedOut = budget < planned;
-      const capNew = cappedOut ? Engine.noteCapOut(meta, 'like', o.maxRounds || 0, capClicks) : false;
-      if (budget <= 0) {
-        Daily.done(meta, 'like', true);
-        if (capNew) Log.warn('点赞', '房间 ' + roomId + ' 已达每房间点赞保护上限（' + capClicks + ' 次），今日不再点赞');
-        return { status: 'done', reason: '已达本房间每日点赞上限' };
-      }
+      /* 不做本地保护上限：开启「允许超过服务端上限」后按设置值执行到底 */
+      const budget = needRounds * perRound;
 
       Log.log('点赞', '房间 ' + roomId + ' 计划点赞 ' + budget + ' 次（每轮 ' + perRound + ' 次，剩 ' + needRounds + ' 轮）');
       let sent = 0;
@@ -498,15 +488,10 @@
       const reachedTarget = !over || (o.maxRounds > 0 && Engine.progressOf(meta, 'like').cur >= o.maxRounds);
       /* 本房间允许的轮次已经做完（自定义上限低于服务端剩余轮次时，服务端不会 is_done），
          按当天完成处理，不写红字 */
-      const reachedPlan = o.maxRounds > 0 && sent >= planned;
-      if ((done || reachedPlan || cappedOut) && (reachedTarget || cappedOut)) {
+      const reachedPlan = o.maxRounds > 0 && sent >= budget;
+      if ((done || reachedPlan) && reachedTarget) {
         Daily.done(meta, 'like', true);
-        if (cappedOut && !reachedPlan) {
-          if (capNew) {
-            Log.warn('点赞', '房间 ' + roomId + ' 已达每房间点赞保护上限（设置 ' + o.maxRounds +
-              ' 轮，实际 ' + Math.floor(sent / perRound) + ' 轮），今日不再继续');
-          }
-        } else if (done) {
+        if (done) {
           Log.ok('点赞', '房间 ' + roomId + ' 点赞任务已完成（本次 ' + sent + ' 次）');
         } else if (over) {
           Log.ok('点赞', '房间 ' + roomId + ' 已做到设置上限 ' + o.maxRounds + ' 轮' +
