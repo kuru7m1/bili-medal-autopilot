@@ -167,8 +167,7 @@
       const roomId = currentPageRoomId();
       if (!roomId) {
         return '<div class="bma-empty">当前页面不是直播间<br>' +
-          '<span class="bma-muted">当前页面不是直播间，观时任务可正常执行；' +
-          '若同时在其它标签页观看直播，该观看会计入账号总并发额度。批量执行与运行日志见上方页签。</span></div>';
+          '<span class="bma-muted">观时任务仍可正常执行；若同时在其它标签页观看直播，会占用账号的并发额度。批量执行与日志见上方页签。</span></div>';
       }
       const d = this.data;
       if (!d || d.roomId !== roomId) {
@@ -544,17 +543,14 @@
       const lim = (name) => Math.max(0, Math.round(Number(tl[name]) || 0));
       const brk = (name) => (typeof tl.brk === 'boolean' ? tl.brk : !!(tl.brk && tl.brk[name]));
       const showNum = (name) => (typeof tl.show === 'boolean' ? tl.show : !(tl.show && tl.show[name] === false));
-      const limitHint = '留空或 0 = 跟随 B 站任务上限';
-      const overNote = '关闭：设置值高于 B 站任务上限时，按 B 站上限执行；开启：按设置值执行。超出 B 站上限的部分不计亲密度，只增加请求与风控风险。';
-      const bottomNote = '每个直播间可在「任务开关」里单独调小，不能超过实际生效上限；做到上限即视为当天完成。';
+      /* 上限与超限规则只在「任务开关」解释一次，各任务卡片不再重复 */
       const overRow = (name) => switchRow('允许超过服务端上限', 'taskLimit.brk.' + name, brk(name),
-        lim(name) > 0 ? '' : '需要先填写上限', lim(name) <= 0) +
-        '<div class="bma-muted">' + overNote + '</div>';
+        lim(name) > 0 ? '' : '需要先填写上限', lim(name) <= 0);
       const out = [];
 
       /* 执行：只保留全局行为，任务参数放到各自的卡片 */
       out.push(sec('执行',
-        switchRow('进入直播站点后自动开始执行', 'autoStart', v.autoStart, '打开任意直播间页面或 live.bilibili.com 首页时自动开始') +
+        switchRow('进入直播站点后自动开始执行', 'autoStart', v.autoStart) +
         switchRow('执行时避让本人正在观看的直播间', 'avoidWatching', v.avoidWatching) +
         switchRow('任务全部完成时发送浏览器通知', 'notify', v.notify)
       ));
@@ -565,8 +561,7 @@
         switchRow('点赞', 'tasks.like', v.tasks.like) +
         switchRow('发弹幕', 'tasks.danmu', v.tasks.danmu) +
         switchRow('观看直播', 'tasks.watch', v.tasks.watch) +
-        switchRow('分享直播间', 'tasks.share', v.tasks.share) +
-        '<div class="bma-muted">这里是总开关；单个直播间还可以在看板卡片的「任务开关」里单独关闭。</div>'
+        switchRow('分享直播间', 'tasks.share', v.tasks.share)
       ));
 
       out.push(sec('点亮熄灭勋章',
@@ -574,7 +569,7 @@
       ));
 
       out.push(sec('点赞',
-        limitRow('每日点赞上限（轮）', 'taskLimit.like', lim('like'), limitHint) +
+        limitRow('每日点赞上限（轮）', 'taskLimit.like', lim('like')) +
         overRow('like') +
         switchRow('看板显示「点赞 n/m」', 'taskLimit.show.like', showNum('like')) +
         '<div class="bma-sec-hd" style="margin-top:10px"><span class="bma-sec-tt">节奏</span></div>' +
@@ -583,60 +578,50 @@
         numberRow('每次最多(次)', 'like.batchMax', v.like.batchMax, 1, 30) +
         numberRow('间隔最小(秒)', 'like.gapMin', v.like.gapMin, 3, 120) +
         numberRow('间隔最大(秒)', 'like.gapMax', v.like.gapMax, 3, 180) +
-        '</div>' +
-        numberRow('每房间每日点赞次数保护上限(次)', 'like.capClicks', v.like.capClicks, 30, 5000) +
-        '<div class="bma-muted">保护上限是硬限制：即使任务上限设得更高，到了这里也会停止。</div>' +
-        '<div class="bma-muted">' + bottomNote + '</div>'
+        '</div>'
       ));
 
       out.push(sec('发弹幕',
-        limitRow('每日弹幕上限（条）', 'taskLimit.danmu', lim('danmu'), limitHint) +
+        limitRow('每日弹幕上限（条）', 'taskLimit.danmu', lim('danmu')) +
         overRow('danmu') +
         switchRow('看板显示「弹幕 n/m」', 'taskLimit.show.danmu', showNum('danmu')) +
-        switchRow('仅在未开播的直播间发送弹幕', 'danmu.onlyWhenNotLive', v.danmu.onlyWhenNotLive, '开启时仅在未开播的直播间发送；关闭后开播中的直播间也会发送，弹幕会展示给主播和观众') +
-        switchRow('优先发送直播间与粉丝团表情', 'danmu.useRoomEmoticons', v.danmu.useRoomEmoticons, '在账号当前可发的表情里随机挑选（房间专属、已解锁的粉丝团 / 大航海 / 充电表情）；取不到或发送失败时改用下方文字') +
+        switchRow('仅在未开播的直播间发送弹幕', 'danmu.onlyWhenNotLive', v.danmu.onlyWhenNotLive) +
+        switchRow('优先发送直播间与粉丝团表情', 'danmu.useRoomEmoticons', v.danmu.useRoomEmoticons) +
         '<div class="bma-sec-hd" style="margin-top:10px"><span class="bma-sec-tt">弹幕内容（每行一条）</span></div>' +
         '<textarea class="bma-input" data-el="danmuText" rows="5" style="width:100%;resize:vertical;margin-top:4px">' + esc((v.danmu.list || []).join('\n')) + '</textarea>' +
-        '<div class="bma-row"><button type="button" class="bma-btn mini primary" data-act="saveDanmu">保存</button>' +
-        '<span class="bma-muted">下方文字为兜底内容；点亮任务在未开播房间也用它</span></div>' +
+        '<div class="bma-row"><button type="button" class="bma-btn mini primary" data-act="saveDanmu">保存</button></div>' +
         '<div class="bma-sec-hd" style="margin-top:10px"><span class="bma-sec-tt">节奏</span></div>' +
         '<div class="bma-grid2">' +
         numberRow('间隔最小(秒)', 'danmu.gapMin', v.danmu.gapMin, 3, 120) +
         numberRow('间隔最大(秒)', 'danmu.gapMax', v.danmu.gapMax, 3, 180) +
-        '</div>' +
-        '<div class="bma-muted">接口返回「发送频率过快」时，将等待 20~45 秒后重试。</div>' +
-        '<div class="bma-muted">' + bottomNote + '</div>'
+        '</div>'
       ));
 
       const watchCap = Engine.effectiveWatchParallel();
       out.push(sec('观看直播',
-        limitRow('每日观时上限（轮）', 'taskLimit.watch', lim('watch'), limitHint) +
+        limitRow('每日观时上限（轮）', 'taskLimit.watch', lim('watch')) +
         overRow('watch') +
         switchRow('看板显示「观时 n/m」', 'taskLimit.show.watch', showNum('watch')) +
-        switchRow('仅对开播中的直播间执行观时', 'watch.requireLive', v.watch.requireLive, '未开播的直播间同样可以记录观时；开启后只挂开播中的房间') +
-        switchRow('记录观时心跳日志', 'watch.logHeartbeat', v.watch.logHeartbeat, '每次心跳成功后写入一条日志') +
-        switchRow('切到后台时继续观时', 'watch.bgContinue', v.watch.bgContinue, '开启（默认）：后台继续发送，浏览器会降频，可能变慢；关闭：后台暂停心跳，回到前台自动续挂') +
-        switchRow('并行执行多个直播间的观时', 'watch.multiRoom', v.watch.multiRoom, '实测同一账号同一时间只记录一个直播间的观时；开启后会向多个房间发送心跳，只会增加风控概率') +
+        switchRow('仅对开播中的直播间执行观时', 'watch.requireLive', v.watch.requireLive) +
+        switchRow('记录观时心跳日志', 'watch.logHeartbeat', v.watch.logHeartbeat) +
+        switchRow('切到后台时继续观时', 'watch.bgContinue', v.watch.bgContinue) +
+        switchRow('并行执行多个直播间的观时', 'watch.multiRoom', v.watch.multiRoom, '同账号同时只记一个房间，开启只会增加风控') +
         numberRow('最大并行直播间数' + (v.watch.multiRoom ? '' : '（未启用，固定为 1）'), 'watch.multiRoomMax', v.watch.multiRoom ? Math.max(1, Number(v.watch.multiRoomMax) || 2) : 1, 1, 999, 1, !v.watch.multiRoom) +
-        '<div class="bma-muted">脚本当前并发：运行中 ' + Engine.watches.length + ' 路（上限 ' + watchCap + ' 路）。</div>' +
-        '<div class="bma-muted">' + bottomNote + '</div>'
+        '<div class="bma-muted">脚本当前并发：运行中 ' + Engine.watches.length + ' 路（上限 ' + watchCap + ' 路）。</div>'
       ));
 
       out.push(sec('分享直播间',
-        '<div class="bma-muted">每天 1 次、亲密度 +2。只有通过插件完成的才显示「已完成」；今天已在别处分享过或接口未生效时显示「待确认」。储蓄亲密度满 100 时自动跳过（可在「储蓄亲密度」里关闭该策略）。</div>'
+        '<div class="bma-muted">每天 1 次、+2；只有插件完成的才算「已完成」，否则显示「待确认」。</div>'
       ));
 
       out.push(sec('储蓄亲密度',
-        switchRow('在看板显示已储蓄亲密度', 'showFreeIntimacy', v.showFreeIntimacy, '显示为「已储蓄 / 上限（100）」，投喂灯牌后可领取') +
-        switchRow('储蓄亲密度满 100 时只维持点亮', 'freeFullLite', v.freeFullLite, '满储的房间跳过观时与分享，只做点亮、点赞、弹幕；领取后自动恢复') +
-        numberRow('储蓄亲密度标红阈值', 'freeWarnAt', v.freeWarnAt, 1, 100, 1) +
-        '<div class="bma-muted">达到阈值时只把看板上的数字标红，用于提醒接近上限（100）。</div>'
+        switchRow('在看板显示已储蓄亲密度', 'showFreeIntimacy', v.showFreeIntimacy) +
+        switchRow('储蓄亲密度满 100 时只维持点亮', 'freeFullLite', v.freeFullLite) +
+        numberRow('储蓄亲密度标红阈值', 'freeWarnAt', v.freeWarnAt, 1, 100, 1)
       ));
 
       out.push(sec('看板显示',
-        switchRow('执行队列显示粉丝牌等级与亲密度', 'showMedalBar', v.showMedalBar !== false,
-          '显示为「Lv.8 23 / 28」，分数是当前亲密度 / 升级所需；鼠标悬停可看还差多少升级') +
-        '<div class="bma-muted">只影响看板卡片，不影响任务执行；粉丝牌索引没取到等级时不显示。</div>'
+        switchRow('执行队列显示粉丝牌等级与亲密度', 'showMedalBar', v.showMedalBar !== false)
       ));
 
       /* 今日累计观时图表：每行独立比例尺（满格 = 该房间任务总时长），竖线固定在轮次分界处 */
@@ -702,8 +687,7 @@
         '</div>');
 
       out.push('<div class="bma-sec"><div class="bma-sec-hd"><span class="bma-sec-tt">体验优化</span></div>' +
-        switchRow('暂停首页自动播放的直播', 'enhance.pauseHome', v.enhance.pauseHome !== false,
-          '首页轮播自动暂停；手动点播放不受影响') +
+        switchRow('暂停首页自动播放的直播', 'enhance.pauseHome', v.enhance.pauseHome !== false) +
         '</div>');
 
       out.push('<div class="bma-sec"><div class="bma-sec-hd"><span class="bma-sec-tt">黑名单</span></div>' +
@@ -725,7 +709,6 @@
         numberRow('触发熔断的连续次数', 'risk.epStrikes', v.risk.epStrikes, 2, 10) +
         numberRow('熔断时长（分钟）', 'risk.epDisableMin', v.risk.epDisableMin, 1, 60) +
         '</div>' +
-        '<div class="bma-muted">默认仅冷却触发风控的接口，其余任务继续执行；仅当 5 分钟内有两个及以上接口触发风控时，才升级为账号级暂停。</div>' +
         (epRisk.length ? '<div class="bma-muted">处于冷却或熔断状态的接口：' + epRisk.map((x) =>
           esc(x.ep) + (x.disabled ? '（熔断）' : '（' + Math.ceil((x.until - nowMs()) / 1000) + 's）')
         ).join('、') + '</div>' : '') +
