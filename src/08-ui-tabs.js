@@ -578,9 +578,7 @@
         numberRow('每次最多(次)', 'like.batchMax', v.like.batchMax, 1, 30) +
         numberRow('间隔最小(秒)', 'like.gapMin', v.like.gapMin, 3, 120) +
         numberRow('间隔最大(秒)', 'like.gapMax', v.like.gapMax, 3, 180) +
-        '</div>' +
-        numberRow('每房间每日点赞次数保护上限(次)', 'like.capClicks', v.like.capClicks, 30, 5000) +
-        '<div class="bma-muted">硬限制，优先于任务上限。</div>'
+        '</div>'
       ));
 
       out.push(sec('发弹幕',
@@ -596,8 +594,7 @@
         '<div class="bma-grid2">' +
         numberRow('间隔最小(秒)', 'danmu.gapMin', v.danmu.gapMin, 3, 120) +
         numberRow('间隔最大(秒)', 'danmu.gapMax', v.danmu.gapMax, 3, 180) +
-        '</div>' +
-        '<div class="bma-muted">发送过快时等待 5 秒重试，最多 3 次。</div>'
+        '</div>'
       ));
 
       const watchCap = Engine.effectiveWatchParallel();
@@ -619,7 +616,7 @@
 
       out.push(sec('储蓄亲密度',
         switchRow('在看板显示已储蓄亲密度', 'showFreeIntimacy', v.showFreeIntimacy) +
-        switchRow('储蓄亲密度满 100 时只维持点亮', 'freeFullLite', v.freeFullLite, '满储时跳过观时与分享，领取后恢复') +
+        switchRow('储蓄亲密度满 100 时只维持点亮', 'freeFullLite', v.freeFullLite) +
         numberRow('储蓄亲密度标红阈值', 'freeWarnAt', v.freeWarnAt, 1, 100, 1)
       ));
 
@@ -712,7 +709,6 @@
         numberRow('触发熔断的连续次数', 'risk.epStrikes', v.risk.epStrikes, 2, 10) +
         numberRow('熔断时长（分钟）', 'risk.epDisableMin', v.risk.epDisableMin, 1, 60) +
         '</div>' +
-        '<div class="bma-muted">仅冷却出问题的接口；两个以上接口同时风控才全局暂停。</div>' +
         (epRisk.length ? '<div class="bma-muted">处于冷却或熔断状态的接口：' + epRisk.map((x) =>
           esc(x.ep) + (x.disabled ? '（熔断）' : '（' + Math.ceil((x.until - nowMs()) / 1000) + 's）')
         ).join('、') + '</div>' : '') +
