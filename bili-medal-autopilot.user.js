@@ -4631,8 +4631,7 @@ html[data-bma-dark] .bma-panel{background:rgba(22,24,31,.97)}
       const roomId = currentPageRoomId();
       if (!roomId) {
         return '<div class="bma-empty">当前页面不是直播间<br>' +
-          '<span class="bma-muted">当前页面不是直播间，观时任务可正常执行；' +
-          '若同时在其它标签页观看直播，该观看会计入账号总并发额度。批量执行与运行日志见上方页签。</span></div>';
+          '<span class="bma-muted">观时任务仍可正常执行；若同时在其它标签页观看直播，会占用账号的并发额度。批量执行与日志见上方页签。</span></div>';
       }
       const d = this.data;
       if (!d || d.roomId !== roomId) {
@@ -5008,12 +5007,9 @@ html[data-bma-dark] .bma-panel{background:rgba(22,24,31,.97)}
       const lim = (name) => Math.max(0, Math.round(Number(tl[name]) || 0));
       const brk = (name) => (typeof tl.brk === 'boolean' ? tl.brk : !!(tl.brk && tl.brk[name]));
       const showNum = (name) => (typeof tl.show === 'boolean' ? tl.show : !(tl.show && tl.show[name] === false));
-      const limitHint = '留空或 0 = 跟随 B 站任务上限';
-      const overNote = '关闭：设置值高于 B 站任务上限时，按 B 站上限执行；开启：按设置值执行。超出 B 站上限的部分不计亲密度，只增加请求与风控风险。';
-      const bottomNote = '每个直播间可在「任务开关」里单独调小，不能超过实际生效上限；做到上限即视为当天完成。';
+      /* 上限与超限规则只在「任务开关」解释一次，各任务卡片不再重复 */
       const overRow = (name) => switchRow('允许超过服务端上限', 'taskLimit.brk.' + name, brk(name),
-        lim(name) > 0 ? '' : '需要先填写上限', lim(name) <= 0) +
-        '<div class="bma-muted">' + overNote + '</div>';
+        lim(name) > 0 ? '' : '需要先填写上限', lim(name) <= 0);
       const out = [];
 
       /* 执行：只保留全局行为，任务参数放到各自的卡片 */
@@ -5030,7 +5026,7 @@ html[data-bma-dark] .bma-panel{background:rgba(22,24,31,.97)}
         switchRow('发弹幕', 'tasks.danmu', v.tasks.danmu) +
         switchRow('观看直播', 'tasks.watch', v.tasks.watch) +
         switchRow('分享直播间', 'tasks.share', v.tasks.share) +
-        '<div class="bma-muted">这里是总开关；单个直播间还可以在看板卡片的「任务开关」里单独关闭。</div>'
+        '<div class="bma-muted">总开关；单个直播间可在看板「任务开关」里单独关闭，调小后做到该值即视为当天完成。每日上限留空 = 跟随 B 站上限；关闭「允许超过服务端上限」时，超出 B 站上限的部分不计亲密度，只增加风控风险。</div>'
       ));
 
       out.push(sec('点亮熄灭勋章',
@@ -5038,7 +5034,7 @@ html[data-bma-dark] .bma-panel{background:rgba(22,24,31,.97)}
       ));
 
       out.push(sec('点赞',
-        limitRow('每日点赞上限（轮）', 'taskLimit.like', lim('like'), limitHint) +
+        limitRow('每日点赞上限（轮）', 'taskLimit.like', lim('like')) +
         overRow('like') +
         switchRow('看板显示「点赞 n/m」', 'taskLimit.show.like', showNum('like')) +
         '<div class="bma-sec-hd" style="margin-top:10px"><span class="bma-sec-tt">节奏</span></div>' +
@@ -5049,12 +5045,11 @@ html[data-bma-dark] .bma-panel{background:rgba(22,24,31,.97)}
         numberRow('间隔最大(秒)', 'like.gapMax', v.like.gapMax, 3, 180) +
         '</div>' +
         numberRow('每房间每日点赞次数保护上限(次)', 'like.capClicks', v.like.capClicks, 30, 5000) +
-        '<div class="bma-muted">保护上限是硬限制：即使任务上限设得更高，到了这里也会停止。</div>' +
-        '<div class="bma-muted">' + bottomNote + '</div>'
+        '<div class="bma-muted">保护上限是硬限制：即使任务上限设得更高，到了这里也会停止。</div>'
       ));
 
       out.push(sec('发弹幕',
-        limitRow('每日弹幕上限（条）', 'taskLimit.danmu', lim('danmu'), limitHint) +
+        limitRow('每日弹幕上限（条）', 'taskLimit.danmu', lim('danmu')) +
         overRow('danmu') +
         switchRow('看板显示「弹幕 n/m」', 'taskLimit.show.danmu', showNum('danmu')) +
         switchRow('仅在未开播的直播间发送弹幕', 'danmu.onlyWhenNotLive', v.danmu.onlyWhenNotLive, '开启时仅在未开播的直播间发送；关闭后开播中的直播间也会发送，弹幕会展示给主播和观众') +
@@ -5068,13 +5063,12 @@ html[data-bma-dark] .bma-panel{background:rgba(22,24,31,.97)}
         numberRow('间隔最小(秒)', 'danmu.gapMin', v.danmu.gapMin, 3, 120) +
         numberRow('间隔最大(秒)', 'danmu.gapMax', v.danmu.gapMax, 3, 180) +
         '</div>' +
-        '<div class="bma-muted">接口返回「发送频率过快」时，将等待 20~45 秒后重试。</div>' +
-        '<div class="bma-muted">' + bottomNote + '</div>'
+        '<div class="bma-muted">发送过快时等待 5 秒重试，最多 3 次。</div>'
       ));
 
       const watchCap = Engine.effectiveWatchParallel();
       out.push(sec('观看直播',
-        limitRow('每日观时上限（轮）', 'taskLimit.watch', lim('watch'), limitHint) +
+        limitRow('每日观时上限（轮）', 'taskLimit.watch', lim('watch')) +
         overRow('watch') +
         switchRow('看板显示「观时 n/m」', 'taskLimit.show.watch', showNum('watch')) +
         switchRow('仅对开播中的直播间执行观时', 'watch.requireLive', v.watch.requireLive, '未开播的直播间同样可以记录观时；开启后只挂开播中的房间') +
@@ -5082,8 +5076,7 @@ html[data-bma-dark] .bma-panel{background:rgba(22,24,31,.97)}
         switchRow('切到后台时继续观时', 'watch.bgContinue', v.watch.bgContinue, '开启（默认）：后台继续发送，浏览器会降频，可能变慢；关闭：后台暂停心跳，回到前台自动续挂') +
         switchRow('并行执行多个直播间的观时', 'watch.multiRoom', v.watch.multiRoom, '实测同一账号同一时间只记录一个直播间的观时；开启后会向多个房间发送心跳，只会增加风控概率') +
         numberRow('最大并行直播间数' + (v.watch.multiRoom ? '' : '（未启用，固定为 1）'), 'watch.multiRoomMax', v.watch.multiRoom ? Math.max(1, Number(v.watch.multiRoomMax) || 2) : 1, 1, 999, 1, !v.watch.multiRoom) +
-        '<div class="bma-muted">脚本当前并发：运行中 ' + Engine.watches.length + ' 路（上限 ' + watchCap + ' 路）。</div>' +
-        '<div class="bma-muted">' + bottomNote + '</div>'
+        '<div class="bma-muted">脚本当前并发：运行中 ' + Engine.watches.length + ' 路（上限 ' + watchCap + ' 路）。</div>'
       ));
 
       out.push(sec('分享直播间',
