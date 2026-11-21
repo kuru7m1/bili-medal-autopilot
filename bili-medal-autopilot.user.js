@@ -2,9 +2,9 @@
 // @name         bilibili粉丝团任务工具
 // @name:en      bili-medal-autopilot
 // @namespace    https://github.com/kuru7m1
-// @version      1.0.0
-// @description  白名单批量完成B站直播粉丝团任务（点亮熄灭勋章/点赞/发弹幕/观看直播）+ 亲密度面板 + 直播体验优化
-// @description:en  Batch complete Bilibili live fan-medal tasks for whitelisted rooms, intimacy panel and live UX tweaks.
+// @version      1.0.1
+// @description  自动完成 B 站粉丝团五项每日任务（点亮 / 点赞 / 弹幕 / 观时 / 分享）
+// @description:en  Automatically completes the five daily fan-medal tasks on Bilibili live rooms: light up, like, danmaku, watch, share.
 // @author       kuru7m1
 // @license      MIT
 // @icon         https://raw.githubusercontent.com/kuru7m1/bili-medal-autopilot/main/assets/icon.png
@@ -28,7 +28,7 @@
   window.__BMA_ACTIVE__ = true;
 
   const APP = 'BMA';
-  const VERSION = '1.0.0';
+  const VERSION = '1.0.1';
 
   const LSKEY = {
     config: 'bma.config.v1',
